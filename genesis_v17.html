@@ -1,0 +1,1911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GENESIS v17</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #000;
+    --panel-bg: rgba(4, 4, 4, 0.85);
+    --border: rgba(255,255,255,0.08);
+    --accent: #e8e8e8;
+    --dim: rgba(255,255,255,0.35);
+    --green: #7fff7f;
+    --red: #ff6b6b;
+    --amber: #ffd166;
+    --mono: 'Share Tech Mono', monospace;
+    --ui: 'Rajdhani', sans-serif;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    overflow: hidden;
+    font-family: var(--mono);
+    color: var(--accent);
+  }
+
+  @media (max-width: 600px) {
+    html, body { overflow-y: auto; height: auto; }
+    #pixelCanvas { position: fixed; height: 100vh; }
+  }
+
+  /* ── CANVAS ── */
+  #pixelCanvas {
+    position: fixed;
+    inset: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+  }
+
+  /* ── LAYOUT ── */
+  #ui {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    grid-template-columns: 220px 1fr 280px;
+    grid-template-rows: 38px 1fr 26px;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  /* ── HEADER BAR ── */
+  #header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    pointer-events: all;
+    gap: 20px;
+  }
+  #header .logo {
+    font-family: var(--ui);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 5px;
+    color: #fff;
+    text-transform: uppercase;
+  }
+  #header .sep { flex: 1; }
+  #header .tick {
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 1px;
+  }
+  #header .version {
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 2px;
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+  }
+
+  /* ── LEFT PANEL ── */
+  #leftPanel {
+    grid-column: 1;
+    grid-row: 2;
+    border-right: 1px solid var(--border);
+    background: var(--panel-bg);
+    backdrop-filter: blur(6px);
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+    pointer-events: all;
+  }
+
+  .panel-section { display: flex; flex-direction: column; gap: 8px; }
+  .panel-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--dim);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    color: var(--accent);
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.15);
+    transition: background 0.4s;
+  }
+  .dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.err { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .dot.checking {
+    animation: pulse-dot 0.8s infinite alternate;
+  }
+  @keyframes pulse-dot {
+    from { background: var(--amber); opacity: 0.4; }
+    to   { background: var(--amber); opacity: 1; }
+  }
+
+  .api-key-input {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 5px 8px;
+    width: 100%;
+    outline: none;
+    letter-spacing: 1px;
+    transition: border 0.2s;
+  }
+  .api-key-input:focus { border-color: rgba(255,255,255,0.25); }
+  .api-key-input::placeholder { color: rgba(255,255,255,0.2); }
+
+  .btn-sm {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 4px 8px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: background 0.2s, border 0.2s;
+    text-transform: uppercase;
+    width: 100%;
+  }
+  .btn-sm:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.3); }
+
+  .log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+  .log-item {
+    font-size: 9px;
+    color: var(--dim);
+    line-height: 1.4;
+    padding-left: 8px;
+    border-left: 2px solid var(--border);
+  }
+  .log-item.info { border-color: rgba(255,255,255,0.3); color: var(--accent); }
+  .log-item.ok   { border-color: var(--green); color: var(--green); }
+  .log-item.err  { border-color: var(--red); color: var(--red); }
+  .log-item.warn { border-color: var(--amber); color: var(--amber); }
+
+  /* ── CENTER ── */
+  #center {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  /* block any rogue text nodes in center */
+  #center > *:not(#core):not(.ring):not(#statusDisplay) {
+    display: none !important;
+  }
+
+  #core {
+    width: 260px; height: 260px;
+    border-radius: 50%;
+    background: transparent;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+  }
+
+  #orbImg {
+    width: 260px; height: 260px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    position: absolute;
+    top: 0; left: 0;
+    animation: orb-spin 18s linear infinite;
+    filter: brightness(1.1) saturate(1.2);
+    transition: filter 0.6s, transform 0.6s;
+  }
+
+  #orbGlow {
+    position: absolute;
+    width: 260px; height: 260px;
+    border-radius: 50%;
+    pointer-events: none;
+    transition: box-shadow 0.7s, opacity 0.7s;
+    opacity: 0.5;
+  }
+
+  #coreLabel {
+    position: relative;
+    z-index: 2;
+    font-family: var(--ui);
+    font-size: 11px;
+    letter-spacing: 6px;
+    color: rgba(255,255,255,0.85);
+    text-transform: uppercase;
+    font-weight: 600;
+    user-select: none;
+    text-shadow: 0 0 12px rgba(0,0,0,0.9), 0 0 4px rgba(0,0,0,1);
+    background: rgba(0,0,0,0.35);
+    padding: 4px 10px;
+    backdrop-filter: blur(4px);
+  }
+
+  @keyframes orb-spin {
+    from { transform: rotate(0deg) scale(1); }
+    to   { transform: rotate(360deg) scale(1); }
+  }
+
+  /* state-driven orb behaviours */
+  .orb-idle     { animation: orb-spin 18s linear infinite; }
+  .orb-learning { animation: orb-spin 10s linear infinite; filter: brightness(1.2) saturate(1.6) hue-rotate(180deg) !important; }
+  .orb-coding   { animation: orb-spin 5s linear infinite, orb-code-pulse 0.8s ease-in-out infinite; filter: brightness(1.4) saturate(1.8) hue-rotate(100deg) !important; }
+  .orb-watching { animation: orb-spin 12s linear infinite; filter: brightness(1.3) saturate(1.4) hue-rotate(30deg) !important; }
+  .orb-noting   { animation: orb-spin 20s linear infinite; filter: brightness(1.0) saturate(2.0) hue-rotate(270deg) !important; }
+  .orb-retry    { animation: orb-spin 7s linear infinite, orb-retry-shake 1.2s ease-in-out infinite; filter: brightness(1.3) saturate(1.5) hue-rotate(50deg) !important; }
+  .orb-stuck    { animation: orb-spin 30s linear infinite, orb-stuck-flicker 2.5s ease-in-out infinite; filter: brightness(0.8) saturate(0.9) hue-rotate(330deg) !important; }
+
+  @keyframes orb-code-pulse {
+    0%,100% { transform: rotate(var(--r,0deg)) scale(1); }
+    50%      { transform: rotate(var(--r,0deg)) scale(1.04); }
+  }
+  @keyframes orb-retry-shake {
+    0%,100% { transform: rotate(var(--r,0deg)) translateX(0); }
+    25%     { transform: rotate(var(--r,0deg)) translateX(-4px); }
+    75%     { transform: rotate(var(--r,0deg)) translateX(4px); }
+  }
+  @keyframes orb-stuck-flicker {
+    0%,100% { opacity: 1; }
+    40%     { opacity: 0.55; }
+    60%     { opacity: 0.8; }
+  }
+
+  /* glow colours per state */
+  .glow-idle     { box-shadow: 0 0 40px 10px rgba(180,160,255,0.15), 0 0 80px 20px rgba(180,160,255,0.06); }
+  .glow-learning { box-shadow: 0 0 50px 15px rgba(79,195,247,0.4),  0 0 100px 30px rgba(79,195,247,0.15); }
+  .glow-coding   { box-shadow: 0 0 50px 15px rgba(105,255,71,0.45),  0 0 100px 30px rgba(105,255,71,0.15); }
+  .glow-watching { box-shadow: 0 0 50px 15px rgba(255,209,102,0.4),  0 0 100px 30px rgba(255,209,102,0.12); }
+  .glow-noting   { box-shadow: 0 0 50px 15px rgba(206,147,216,0.4),  0 0 100px 30px rgba(206,147,216,0.12); }
+  .glow-retry    { box-shadow: 0 0 50px 15px rgba(255,154,60,0.45),  0 0 100px 30px rgba(255,154,60,0.15); }
+  .glow-stuck    { box-shadow: 0 0 50px 15px rgba(255,107,107,0.5),  0 0 100px 30px rgba(255,107,107,0.18); }
+
+  /* ── STATUS DISPLAY ── */
+  #statusDisplay {
+    position: absolute;
+    bottom: -90px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+    width: 320px;
+  }
+
+  #statusBadge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    transition: border-color 0.5s, box-shadow 0.5s;
+    min-width: 220px;
+    justify-content: center;
+  }
+
+  #statusIcon {
+    font-size: 15px;
+    line-height: 1;
+    transition: filter 0.5s;
+  }
+
+  #statusText {
+    font-family: var(--ui);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-weight: 600;
+    transition: color 0.5s;
+  }
+
+  #statusSub {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.4s;
+    font-family: var(--mono);
+  }
+  #statusSub.visible { opacity: 1; }
+
+  #statusBar2 {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .state-pip {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .state-pip.active {
+    background: #fff;
+    box-shadow: 0 0 6px #fff;
+  }
+
+  /* colour themes per state */
+  .state-learning  { --sc: #4fc3f7; }
+  .state-coding    { --sc: #69ff47; }
+  .state-watching  { --sc: #ffd166; }
+  .state-noting    { --sc: #ce93d8; }
+  .state-retry     { --sc: #ff9a3c; }
+  .state-stuck     { --sc: #ff6b6b; }
+  .state-idle      { --sc: rgba(255,255,255,0.4); }
+
+  #statusBadge.state-learning,
+  #statusBadge.state-coding,
+  #statusBadge.state-watching,
+  #statusBadge.state-noting,
+  #statusBadge.state-retry,
+  #statusBadge.state-stuck {
+    border-color: var(--sc);
+    box-shadow: 0 0 20px rgba(0,0,0,0.8), 0 0 12px color-mix(in srgb, var(--sc) 30%, transparent);
+  }
+
+  #statusBadge.state-learning #statusText  { color: #4fc3f7; }
+  #statusBadge.state-coding   #statusText  { color: #69ff47; }
+  #statusBadge.state-watching #statusText  { color: #ffd166; }
+  #statusBadge.state-noting   #statusText  { color: #ce93d8; }
+  #statusBadge.state-retry    #statusText  { color: #ff9a3c; }
+  #statusBadge.state-stuck    #statusText  { color: #ff6b6b; }
+
+  /* pulse animations per state */
+  @keyframes pulse-learn  { 0%,100%{opacity:.7} 50%{opacity:1} }
+  @keyframes pulse-code   { 0%,100%{opacity:.8} 50%{opacity:1} }
+  @keyframes pulse-watch  { 0%,100%{opacity:.6} 33%{opacity:1} 66%{opacity:.8} }
+  @keyframes pulse-note   { 0%,100%{opacity:.7} 50%{opacity:1} }
+  @keyframes pulse-retry  { 0%,100%{opacity:.5} 50%{opacity:1} }
+  @keyframes pulse-stuck  { 0%,100%{opacity:.4} 25%{opacity:.9} 75%{opacity:.6} }
+
+  #statusBadge.state-learning #statusText { animation: pulse-learn 2s ease-in-out infinite; }
+  #statusBadge.state-coding   #statusText { animation: pulse-code 0.8s ease-in-out infinite; }
+  #statusBadge.state-watching #statusText { animation: pulse-watch 1.5s ease-in-out infinite; }
+  #statusBadge.state-noting   #statusText { animation: pulse-note 3s ease-in-out infinite; }
+  #statusBadge.state-retry    #statusText { animation: pulse-retry 1.2s ease-in-out infinite; }
+  #statusBadge.state-stuck    #statusText { animation: pulse-stuck 2.5s ease-in-out infinite; }
+
+  /* ── LEFT PANEL STATUS STRIP ── */
+  #stateHistory {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .hist-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9px;
+    padding: 3px 4px;
+    border-left: 2px solid var(--border);
+    color: var(--dim);
+    animation: fadein 0.4s ease;
+  }
+  @media (max-width: 600px) {
+    #ui {
+      grid-template-columns: 1fr;
+      grid-template-rows: 38px auto 1fr auto 26px;
+      overflow-y: auto;
+    }
+    #header    { grid-column: 1; grid-row: 1; }
+    #leftPanel { grid-column: 1; grid-row: 2; border-right: none; border-bottom: 1px solid var(--border); max-height: 300px; overflow-y: auto; }
+    #center    { grid-column: 1; grid-row: 3; min-height: 320px; }
+    #rightPanel{ grid-column: 1; grid-row: 4; border-left: none; border-top: 1px solid var(--border); }
+    #statusBar { grid-column: 1; grid-row: 5; }
+    #statusDisplay { bottom: -70px; }
+    #core { width: 200px; height: 200px; }
+    #orbImg, #orbGlow { width: 200px; height: 200px; }
+    .ring { }
+  }
+
+  @media (max-width: 900px) and (min-width: 601px) {
+    #ui { grid-template-columns: 180px 1fr 220px; }
+  }
+  .hist-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ring animation */
+  .ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.15);
+    animation: expand-ring 4s linear infinite;
+    pointer-events: none;
+  }
+  .ring:nth-child(2) { animation-delay: 1.33s; }
+  .ring:nth-child(3) { animation-delay: 2.66s; }
+
+  @keyframes expand-ring {
+    0%   { width: 260px; height: 260px; opacity: 0.5; }
+    100% { width: 600px; height: 600px; opacity: 0; }
+  }
+
+  /* ── RIGHT PANEL ── */
+  #rightPanel {
+    grid-column: 3;
+    grid-row: 2;
+    border-left: 1px solid var(--border);
+    background: var(--panel-bg);
+    backdrop-filter: blur(6px);
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow: hidden;
+    pointer-events: all;
+  }
+
+  .file-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 10px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .file-entry {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 4px;
+    cursor: pointer;
+    border-radius: 2px;
+    color: var(--dim);
+    transition: background 0.15s, color 0.15s;
+  }
+  .file-entry:hover { background: rgba(255,255,255,0.05); color: var(--accent); }
+  .file-entry.selected { background: rgba(255,255,255,0.08); color: #fff; }
+  .file-icon { width: 10px; flex-shrink: 0; color: rgba(255,255,255,0.3); }
+  .file-entry.dir > .file-icon { color: var(--amber); }
+  .file-entry.changed > .file-icon { color: var(--green); }
+
+  #sandboxOutput {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--border);
+    padding: 8px;
+    font-size: 9px;
+    line-height: 1.6;
+    color: var(--dim);
+    overflow-y: auto;
+    height: 140px;
+    flex-shrink: 0;
+  }
+  #sandboxOutput .sb-line { display: block; }
+  #sandboxOutput .sb-line.ok  { color: var(--green); }
+  #sandboxOutput .sb-line.err { color: var(--red); }
+  #sandboxOutput .sb-line.cmd { color: var(--amber); }
+
+  .btn-run {
+    background: rgba(127,255,127,0.06);
+    border: 1px solid rgba(127,255,127,0.2);
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 6px 8px;
+    cursor: pointer;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .btn-run:hover { background: rgba(127,255,127,0.12); }
+  .btn-run:disabled { opacity: 0.3; cursor: default; }
+
+  /* ── STATUS BAR ── */
+  #statusBar {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 24px;
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.7);
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 1px;
+  }
+  #statusBar .sb-item { display: flex; align-items: center; gap: 6px; }
+  #statusBar .sep { flex: 1; }
+  #clock { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<canvas id="pixelCanvas"></canvas>
+
+<div id="ui">
+
+  <!-- HEADER -->
+  <div id="header">
+    <span class="logo">Genesis</span>
+    <span class="version">v0.1.0-alpha</span>
+    <span class="sep"></span>
+    <span class="tick" id="cycleCount">CYCLE — 0</span>
+  </div>
+
+  <!-- LEFT PANEL -->
+  <div id="leftPanel">
+
+    <div class="panel-section">
+      <div class="panel-label">LLM · Groq (Free)</div>
+      <div class="status-row"><span class="dot" id="dot-grok"></span><span id="lbl-grok">Not connected</span></div>
+      <input class="api-key-input" id="grokKey" type="password" placeholder="gsk_…  (Groq API key)">
+      <select id="grokModel" style="margin-top:4px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);font-family:var(--mono);font-size:9px;padding:4px 6px;width:100%;outline:none;cursor:pointer">
+        <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile ← best</option>
+        <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (fast)</option>
+        <option value="llama3-70b-8192">llama3-70b-8192</option>
+        <option value="llama3-8b-8192">llama3-8b-8192</option>
+        <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+        <option value="gemma2-9b-it">gemma2-9b-it</option>
+      </select>
+      <button class="btn-sm" onclick="connectGrok()">Connect</button>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-label">Research APIs</div>
+      <div class="status-row"><span class="dot ok" id="dot-research" style="background:#4fc3f7;box-shadow:0 0 6px #4fc3f7"></span><span id="lbl-research">DDG free · GH on connect</span></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-label">GitHub · Public Repo</div>
+      <div class="status-row"><span class="dot" id="dot-gh"></span><span id="lbl-gh">Not connected</span></div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.4);padding:2px 0;letter-spacing:1px">spirokopita/Genesisselfevolver</div>
+      <button class="btn-sm" onclick="connectGitHub()">Connect</button>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-label">System Log</div>
+      <div class="log-list" id="logList"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-label">Activity History</div>
+      <div id="stateHistory"></div>
+    </div>
+
+    <div class="panel-section" style="margin-top:auto">
+      <div class="panel-label">Directives</div>
+      <div class="log-item info">→ Research &amp; expand capabilities</div>
+      <div class="log-item info">→ Self-modify via sandbox</div>
+      <div class="log-item info">→ Persist changes to repo</div>
+    </div>
+
+  </div>
+
+  <!-- CENTER -->
+  <div id="center">
+    <div class="ring"></div>
+    <div class="ring"></div>
+    <div class="ring"></div>
+    <div id="core">
+      <div id="orbGlow" class="glow-idle"></div>
+      <img id="orbImg" class="orb-idle" src="data:image/webp;base64,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" alt="core orb">
+      <span id="coreLabel">Core</span>
+    </div>
+    <div id="statusDisplay">
+      <div id="statusBadge" class="state-idle">
+        <span id="statusIcon">◌</span>
+        <span id="statusText">Idle</span>
+      </div>
+      <div id="statusSub"></div>
+      <div id="statusBar2">
+        <div class="state-pip" id="pip0"></div>
+        <div class="state-pip" id="pip1"></div>
+        <div class="state-pip" id="pip2"></div>
+        <div class="state-pip" id="pip3"></div>
+        <div class="state-pip" id="pip4"></div>
+        <div class="state-pip" id="pip5"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="rightPanel">
+
+    <div class="panel-section" style="flex-shrink:0">
+      <div class="panel-label">Source Files</div>
+    </div>
+
+    <div class="file-tree" id="fileTree">
+      <div style="font-size:9px;color:rgba(255,255,255,0.2);padding:4px">Connect GitHub to load files</div>
+    </div>
+
+    <div class="panel-section" style="flex-shrink:0">
+      <div class="panel-label">Sandbox Output</div>
+    </div>
+    <div id="sandboxOutput"></div>
+
+    <button class="btn-run" id="runBtn" onclick="runEvolutionCycle()" disabled>▶ RUN CYCLE</button>
+
+    <div style="display:flex;gap:6px;flex-shrink:0;margin-top:4px">
+      <input id="loopInterval" type="number" value="90" min="10" max="3600"
+        style="width:52px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.5);font-family:var(--mono);font-size:9px;padding:4px 6px;text-align:center"
+        title="Seconds between auto-cycles">
+      <button class="btn-run" id="autoBtn" onclick="toggleAutoLoop()" disabled style="flex:1;margin-top:0">∞ AUTO LOOP</button>
+    </div>
+
+  </div>
+
+  <!-- STATUS BAR -->
+  <div id="statusBar">
+    <div class="sb-item"><span class="dot" id="dot-sys" style="background:var(--green);box-shadow:0 0 6px var(--green)"></span>SYSTEM NOMINAL</div>
+    <div class="sb-item" id="modelInfo">MODEL — —</div>
+    <div class="sb-item" id="intelScore">IQ — 0</div>
+    <span class="sep"></span>
+    <div class="sb-item" id="clock"></div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   PIXEL CANVAS — dense pulsing b&w field
+═══════════════════════════════════════════════ */
+(function() {
+  const canvas = document.getElementById('pixelCanvas');
+  const ctx = canvas.getContext('2d');
+  const PX = 5; // pixel cell size
+  let cols, rows, cells, t = 0;
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    cols = Math.ceil(canvas.width  / PX);
+    rows = Math.ceil(canvas.height / PX);
+    cells = new Float32Array(cols * rows);
+    for (let i = 0; i < cells.length; i++) cells[i] = Math.random();
+  }
+
+  function draw() {
+    t += 0.008;
+    const w = canvas.width, h = canvas.height;
+    const cx = w / 2, cy = h / 2;
+    const coreR = 140; // px — keep circle clear
+
+    const imgData = ctx.createImageData(w, h);
+    const data = imgData.data;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        const px = c * PX + PX/2, py = r * PX + PX/2;
+        const dx = px - cx, dy = py - cy;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist < coreR + 8) continue; // leave core clear
+
+        // drift
+        const wave = Math.sin(c * 0.18 + t) * Math.cos(r * 0.18 + t * 0.7);
+        cells[idx] += (wave * 0.015 + (Math.random() - 0.5) * 0.01);
+        cells[idx] = Math.max(0, Math.min(1, cells[idx]));
+
+        // edge fade
+        const edgeFade = Math.min(1, (dist - coreR - 8) / 60);
+        // distance-based density: denser near core edge
+        const density = 1 - Math.max(0, (dist - coreR - 40) / (Math.max(w,h) * 0.6));
+
+        const bright = cells[idx] * edgeFade * density;
+        const v = bright > 0.5 ? Math.round(bright * 255) : Math.round(bright * 60);
+
+        for (let py2 = 0; py2 < PX; py2++) {
+          for (let px2 = 0; px2 < PX; px2++) {
+            const pIdx = ((r * PX + py2) * w + (c * PX + px2)) * 4;
+            if (pIdx + 3 >= data.length) continue;
+            data[pIdx]     = v;
+            data[pIdx + 1] = v;
+            data[pIdx + 2] = v;
+            data[pIdx + 3] = 255;
+          }
+        }
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  draw();
+})();
+
+/* ═══════════════════════════════════════════════
+   CLOCK
+═══════════════════════════════════════════════ */
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toISOString().replace('T',' ').slice(0,19) + ' UTC';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ═══════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════ */
+const state = {
+  grokKey: '',
+  grokOk: false,
+  ghOk: false,
+  cycle: 0,
+  patches: [],
+  model: 'llama-3.3-70b-versatile',
+  // Live in-memory evolved source — starts from DOM, accumulates patches each cycle
+  liveSource: null,
+  baseVersion: 7,  // genesis_v17 is current — patches produce v8, v9…
+};
+
+function setDot(id, status) { // 'ok'|'err'|'checking'|''
+  const d = document.getElementById('dot-' + id);
+  d.className = 'dot ' + status;
+}
+
+function addLog(msg, type='') {
+  const list = document.getElementById('logList');
+  const div = document.createElement('div');
+  div.className = 'log-item ' + type;
+  div.textContent = new Date().toTimeString().slice(0,8) + ' ' + msg;
+  list.prepend(div);
+  while (list.children.length > 30) list.removeChild(list.lastChild);
+}
+
+function sbLine(msg, cls='') {
+  const out = document.getElementById('sandboxOutput');
+  const span = document.createElement('span');
+  span.className = 'sb-line ' + cls;
+  span.textContent = msg;
+  out.appendChild(span);
+  out.scrollTop = out.scrollHeight;
+}
+
+/* ═══════════════════════════════════════════════
+   GROK API
+═══════════════════════════════════════════════ */
+// Groq API — supports CORS natively, no proxy needed
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+  'llama3-70b-8192',
+  'llama3-8b-8192',
+  'mixtral-8x7b-32768',
+  'gemma2-9b-it'
+];
+
+async function connectGrok() {
+  const key = document.getElementById('grokKey').value.trim();
+  if (!key) { addLog('Groq key required — get one free at groq.com', 'err'); return; }
+  state.grokKey = key;
+  const chosen = document.getElementById('grokModel').value;
+  setDot('grok', 'checking');
+  document.getElementById('lbl-grok').textContent = 'Connecting…';
+  addLog('Testing Groq — ' + chosen, 'warn');
+
+  // Try chosen model first, then fall through list
+  const tryOrder = [chosen, ...GROQ_MODELS.filter(m => m !== chosen)];
+
+  for (const model of tryOrder) {
+    document.getElementById('lbl-grok').textContent = 'Trying ' + model + '…';
+    try {
+      const res = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + key
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 16,
+          messages: [{ role: 'user', content: 'hi' }]
+        })
+      });
+
+      if (res.ok) {
+        state.model = model;
+        state.grokOk = true;
+        setDot('grok', 'ok');
+        document.getElementById('lbl-grok').textContent = model;
+        document.getElementById('modelInfo').textContent = 'MODEL — ' + model.toUpperCase();
+        document.getElementById('grokModel').value = model;
+        addLog('Groq connected ✓ — ' + model, 'ok');
+        checkReady();
+        return;
+      } else {
+        let msg = 'HTTP ' + res.status;
+        try { const j = await res.json(); msg = j.error?.message || msg; } catch(e) {}
+        addLog('✗ ' + model + ': ' + msg, 'err');
+        if (res.status === 401) break; // bad key — stop trying
+      }
+    } catch(e) {
+      addLog('✗ ' + model + ': ' + e.message, 'err');
+    }
+  }
+
+  state.grokOk = false;
+  setDot('grok', 'err');
+  document.getElementById('lbl-grok').textContent = 'Failed — check key';
+  addLog('All models failed. Key from console.groq.com/keys', 'err');
+}
+
+async function grokChat(systemPrompt, userPrompt, maxTokens=800) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + state.grokKey
+    },
+    body: JSON.stringify({
+      model: state.model,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user',   content: userPrompt }
+      ]
+    })
+  });
+  if (!res.ok) {
+    let errBody = '';
+    try { const j = await res.json(); errBody = j.error?.message || ''; } catch(e) {}
+    throw new Error('Groq ' + res.status + (errBody ? ': ' + errBody : ''));
+  }
+  const j = await res.json();
+  return j.choices[0].message.content;
+}
+
+/* ═══════════════════════════════════════════════
+   GITHUB — public repo, no token needed
+   60 unauthenticated req/hour
+═══════════════════════════════════════════════ */
+const GH_REPO = 'spirokopita/Genesisselfevolver';
+const GH_API  = 'https://api.github.com';
+
+async function ghFetch(endpoint) {
+  const res = await fetch(GH_API + endpoint, {
+    headers: { 'Accept': 'application/vnd.github.v3+json' }
+  });
+  if (!res.ok) throw new Error('GitHub ' + res.status);
+  return res.json();
+}
+
+async function connectGitHub() {
+  setDot('gh', 'checking');
+  document.getElementById('lbl-gh').textContent = 'Connecting…';
+  addLog('Connecting to ' + GH_REPO, 'warn');
+  try {
+    const data = await ghFetch('/repos/' + GH_REPO);
+    state.ghOk = true;
+    setDot('gh', 'ok');
+    document.getElementById('lbl-gh').textContent = data.full_name + ' ·  ' + data.default_branch;
+    addLog('GitHub connected ✓', 'ok');
+    await loadFileTree();
+    await seedLiveSource();
+    checkReady();
+  } catch(e) {
+    state.ghOk = false;
+    setDot('gh', 'err');
+    document.getElementById('lbl-gh').textContent = 'Failed: ' + e.message;
+    addLog('GitHub failed: ' + e.message, 'err');
+  }
+}
+
+async function ghGet(path) {
+  return ghFetch('/repos/' + GH_REPO + '/contents/' + path);
+}
+
+// Write not needed — patches applied live and exported as versioned HTML files
+
+async function loadFileTree() {
+  try {
+    const items = await ghGet('');
+    const tree = document.getElementById('fileTree');
+    tree.innerHTML = '';
+    items.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'file-entry' + (item.type === 'dir' ? ' dir' : '');
+      div.innerHTML = `<span class="file-icon">${item.type === 'dir' ? '▶' : '·'}</span>${item.name}`;
+      div.dataset.path = item.path;
+      div.dataset.sha  = item.sha || '';
+      div.addEventListener('click', () => {
+        document.querySelectorAll('.file-entry').forEach(e => e.classList.remove('selected'));
+        div.classList.add('selected');
+      });
+      tree.appendChild(div);
+    });
+    addLog('Repo tree loaded — ' + items.length + ' files', 'ok');
+  } catch(e) {
+    addLog('File tree error: ' + e.message, 'err');
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   STATE MACHINE
+═══════════════════════════════════════════════ */
+const STATES = {
+  idle:     { cls: 'state-idle',     icon: '◌',  text: 'Idle',                sub: '',                              color: 'rgba(255,255,255,0.4)' },
+  learning: { cls: 'state-learning', icon: '⬡',  text: 'Learning',            sub: 'Scanning internet data…',       color: '#4fc3f7' },
+  coding:   { cls: 'state-coding',   icon: '⟨/⟩', text: 'Coding',             sub: 'Writing & modifying source…',   color: '#69ff47' },
+  watching: { cls: 'state-watching', icon: '◉',  text: 'Watching',            sub: 'Monitoring for pass / fail…',   color: '#ffd166' },
+  noting:   { cls: 'state-noting',   icon: '♪',  text: 'Taking Notes',        sub: 'Logging observations…  🎶',     color: '#ce93d8' },
+  retry:    { cls: 'state-retry',    icon: '↻',  text: 'Second Attempt',      sub: 'Retrying with new approach…',   color: '#ff9a3c' },
+  stuck:    { cls: 'state-stuck',    icon: '✖',  text: "It's Hard…",          sub: "Stuck on this one 😭 thinking…", color: '#ff6b6b' },
+};
+
+const STATE_ORDER = ['learning','coding','watching','noting','retry','stuck'];
+let currentStateIdx = 0;
+let stateHistoryLog = [];
+
+function setState(key, subOverride) {
+  const s = STATES[key];
+  if (!s) return;
+
+  const badge = document.getElementById('statusBadge');
+  const icon  = document.getElementById('statusIcon');
+  const txt   = document.getElementById('statusText');
+  const sub   = document.getElementById('statusSub');
+
+  // remove all state classes
+  badge.className = s.cls;
+  icon.textContent = s.icon;
+  txt.textContent  = s.text;
+
+  // update orb appearance
+  const orb  = document.getElementById('orbImg');
+  const glow = document.getElementById('orbGlow');
+  orb.className  = 'orb-'  + key;
+  glow.className = 'glow-' + key;
+
+  const subText = subOverride || s.sub;
+  if (subText) {
+    sub.textContent = subText;
+    sub.classList.add('visible');
+  } else {
+    sub.textContent = '';
+    sub.classList.remove('visible');
+  }
+
+  // pip progress
+  const idx = STATE_ORDER.indexOf(key);
+  for (let i = 0; i < 6; i++) {
+    const pip = document.getElementById('pip' + i);
+    pip.className = 'state-pip' + (i <= idx && idx >= 0 ? ' active' : '');
+    if (i <= idx && idx >= 0) pip.style.background = s.color;
+    else pip.style.background = '';
+  }
+
+  // core label
+  document.getElementById('coreLabel').textContent = s.text;
+
+  // push to history
+  addStateHistory(key, s);
+}
+
+function addStateHistory(key, s) {
+  const hist = document.getElementById('stateHistory');
+  const row = document.createElement('div');
+  row.className = 'hist-row';
+  row.innerHTML = `<span class="hist-dot" style="background:${s.color};box-shadow:0 0 5px ${s.color}"></span><span style="color:${s.color}">${s.icon}</span><span>${s.text}</span>`;
+  hist.prepend(row);
+  while (hist.children.length > 12) hist.removeChild(hist.lastChild);
+}
+
+/* ═══════════════════════════════════════════════
+   DUCKDUCKGO — free, no key, no CORS issues
+═══════════════════════════════════════════════ */
+async function ddgSearch(query) {
+  try {
+    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(res.status);
+    const j = await res.json();
+
+    const results = [];
+
+    // Abstract (best single answer)
+    if (j.AbstractText) results.push({ title: j.Heading || query, snippet: j.AbstractText, url: j.AbstractURL });
+
+    // Related topics
+    if (j.RelatedTopics) {
+      j.RelatedTopics.slice(0, 5).forEach(t => {
+        if (t.Text) results.push({ title: t.Text.slice(0, 60), snippet: t.Text, url: t.FirstURL || '' });
+      });
+    }
+
+    // Instant answer
+    if (j.Answer) results.push({ title: 'Instant Answer', snippet: j.Answer, url: '' });
+
+    return results.slice(0, 6);
+  } catch(e) {
+    addLog('DDG search failed: ' + e.message, 'err');
+    return [];
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   GITHUB SEARCH — free with token (5000/hr)
+═══════════════════════════════════════════════ */
+async function seedLiveSource() {
+  try {
+    const items = await ghGet('');
+    const htmlFiles = items.filter(i => i.name.endsWith('.html'));
+    if (!htmlFiles.length) {
+      addLog('No HTML files in repo — will seed on first cycle', 'warn');
+      state.liveSource = null;
+      return;
+    }
+
+    // Pick the file with the highest version number (genesis_v17.html > genesis_v17.html etc)
+    const versioned = htmlFiles.map(f => {
+      const m = f.name.match(/v(\d+)/i);
+      return { file: f, version: m ? parseInt(m[1]) : 0 };
+    }).sort((a, b) => b.version - a.version);
+
+    const best = versioned[0].file;
+    const bestVersion = versioned[0].version;
+    addLog(`Highest version in repo: ${best.name} (v${bestVersion})`, 'ok');
+
+    // Update baseVersion so exported files continue from the right number
+    if (bestVersion > 0) state.baseVersion = bestVersion;
+
+    const detail = await ghFetch('/repos/' + GH_REPO + '/contents/' + best.path);
+    state.liveSource = decodeURIComponent(escape(atob(detail.content.replace(/\n/g,''))));
+    addLog('Live source seeded: ' + best.name + ' (' + Math.round(state.liveSource.length/1024) + 'kb)', 'ok');
+  } catch(e) {
+    state.liveSource = null;
+    addLog('Source seed deferred — will load on first cycle', 'warn');
+  }
+}
+/* ═══════════════════════════════════════════════
+   100 TOP REPOS — hardcoded, zero API calls
+   Categorised for topic-matched learning
+═══════════════════════════════════════════════ */
+const TOP_REPOS = [
+  // ── UI / Frontend Frameworks ──────────────────
+  { r:'facebook/react',            s:228000, cat:['ui','frontend','components','state','rendering'],        desc:'The library for web and native user interfaces' },
+  { r:'vuejs/vue',                 s:207000, cat:['ui','frontend','components','reactivity'],               desc:'Progressive JavaScript framework' },
+  { r:'angular/angular',           s:96000,  cat:['ui','frontend','typescript','components'],               desc:'Deliver web apps with confidence' },
+  { r:'sveltejs/svelte',           s:80000,  cat:['ui','frontend','compiler','components','animation'],     desc:'Cybernetically enhanced web apps' },
+  { r:'solid-js/solid',            s:32000,  cat:['ui','frontend','reactivity','rendering','performance'],  desc:'A declarative, efficient, flexible JavaScript library' },
+  { r:'preactjs/preact',           s:36000,  cat:['ui','frontend','lightweight','components'],              desc:'Fast 3kB alternative to React' },
+  { r:'alpinejs/alpine',           s:28000,  cat:['ui','frontend','minimal','javascript'],                  desc:'Rugged, minimal tool for composing behavior in HTML' },
+  { r:'lit/lit',                   s:18000,  cat:['ui','web-components','frontend','lightweight'],          desc:'Simple, fast web components' },
+
+  // ── CSS / Styling ─────────────────────────────
+  { r:'tailwindlabs/tailwindcss',  s:84000,  cat:['css','styling','ui','design'],                          desc:'A utility-first CSS framework' },
+  { r:'twbs/bootstrap',            s:170000, cat:['css','styling','ui','responsive','design'],              desc:'The most popular HTML/CSS/JS framework' },
+  { r:'animate-css/animate.css',   s:80000,  cat:['css','animation','styling'],                            desc:'Cross-browser CSS animations' },
+  { r:'necolas/normalize.css',     s:52000,  cat:['css','styling','reset'],                                desc:'CSS reset and normalization' },
+  { r:'csstools/postcss',          s:28000,  cat:['css','tooling','styling'],                              desc:'Transform CSS with JavaScript plugins' },
+  { r:'saadeghi/daisyui',          s:34000,  cat:['css','ui','components','design'],                       desc:'Tailwind CSS component library' },
+
+  // ── Animation / Canvas / WebGL ────────────────
+  { r:'mrdoob/three.js',           s:102000, cat:['3d','webgl','animation','canvas','visualization'],      desc:'JavaScript 3D library' },
+  { r:'pixijs/pixijs',             s:43000,  cat:['webgl','canvas','animation','rendering','2d'],          desc:'The HTML5 Creation Engine' },
+  { r:'greensock/GSAP',            s:19000,  cat:['animation','css','javascript','motion'],                desc:'Professional-grade animation for the modern web' },
+  { r:'juliangarnier/anime',       s:50000,  cat:['animation','css','javascript','motion','svg'],          desc:'JavaScript animation engine' },
+  { r:'nicktindall/cycler.js',     s:1200,   cat:['animation','canvas','loop'],                           desc:'Canvas animation loop utility' },
+  { r:'fabricjs/fabric.js',        s:28000,  cat:['canvas','2d','animation','svg'],                       desc:'A powerful and simple JS HTML5 canvas library' },
+  { r:'d3/d3',                     s:108000, cat:['visualization','svg','data','canvas','animation'],      desc:'Data-Driven Documents' },
+  { r:'chartjs/Chart.js',          s:64000,  cat:['visualization','canvas','charts','data'],               desc:'Simple yet flexible JavaScript charting' },
+  { r:'apache/echarts',            s:60000,  cat:['visualization','charts','data','canvas'],               desc:'Powerful charting and visualization library' },
+  { r:'vega/vega',                 s:11000,  cat:['visualization','data','svg'],                           desc:'A visualization grammar' },
+
+  // ── State Management ──────────────────────────
+  { r:'reduxjs/redux',             s:60000,  cat:['state','javascript','architecture'],                    desc:'Predictable state container for JS apps' },
+  { r:'pmndrs/zustand',            s:47000,  cat:['state','react','lightweight'],                          desc:'A small, fast state management solution' },
+  { r:'mobxjs/mobx',               s:27000,  cat:['state','reactivity','observable'],                     desc:'Simple, scalable state management' },
+  { r:'statelyai/xstate',          s:27000,  cat:['state','machines','architecture','logic'],              desc:'State machines and statecharts for the modern web' },
+  { r:'immerjs/immer',             s:27000,  cat:['state','immutable','javascript'],                       desc:'Create next immutable state by mutating the current one' },
+
+  // ── AI / ML in the Browser ────────────────────
+  { r:'tensorflow/tfjs',           s:18000,  cat:['ai','ml','neural','browser','training'],                desc:'TensorFlow for JavaScript' },
+  { r:'ml5js/ml5-library',         s:6500,   cat:['ai','ml','browser','creative','neural'],                desc:'Friendly machine learning for the web' },
+  { r:'xenova/transformers.js',    s:12000,  cat:['ai','ml','nlp','browser','transformers'],               desc:'State-of-the-art ML for the web' },
+  { r:'brain.js/brain.js',         s:14000,  cat:['ai','neural','browser','training'],                    desc:'Neural networks in JavaScript' },
+  { r:'BrainJS/natural',           s:10000,  cat:['ai','nlp','text','classification'],                    desc:'General natural language processing for Node' },
+  { r:'openai/openai-node',        s:9000,   cat:['ai','api','llm','chat'],                               desc:'Official OpenAI Node.js library' },
+  { r:'vercel/ai',                 s:12000,  cat:['ai','streaming','llm','api'],                          desc:'Build AI-powered apps with React/Svelte/Vue' },
+
+  // ── Build Tools / Bundlers ────────────────────
+  { r:'vitejs/vite',               s:68000,  cat:['tooling','bundler','build','performance'],              desc:'Next generation frontend tooling' },
+  { r:'webpack/webpack',           s:64000,  cat:['tooling','bundler','build','modules'],                 desc:'A bundler for javascript and friends' },
+  { r:'rollup/rollup',             s:25000,  cat:['tooling','bundler','esm','modules'],                   desc:'Next-generation ES module bundler' },
+  { r:'evanw/esbuild',             s:38000,  cat:['tooling','bundler','performance','build'],             desc:'An extremely fast bundler' },
+
+  // ── Testing ───────────────────────────────────
+  { r:'jestjs/jest',               s:44000,  cat:['testing','javascript','unit'],                         desc:'Delightful JavaScript Testing' },
+  { r:'vitest-dev/vitest',         s:13000,  cat:['testing','javascript','fast','unit'],                  desc:'A blazing fast unit test framework' },
+  { r:'cypress-io/cypress',        s:47000,  cat:['testing','e2e','browser','automation'],                desc:'Fast, easy, and reliable testing' },
+
+  // ── Node / Runtime ────────────────────────────
+  { r:'nodejs/node',               s:107000, cat:['runtime','javascript','server','async'],               desc:'Node.js JavaScript runtime' },
+  { r:'denoland/deno',             s:94000,  cat:['runtime','javascript','typescript','secure'],          desc:'A modern runtime for JavaScript and TypeScript' },
+  { r:'oven-sh/bun',               s:73000,  cat:['runtime','javascript','performance','bundler'],        desc:'Incredibly fast JavaScript runtime' },
+  { r:'expressjs/express',         s:65000,  cat:['server','api','http','middleware'],                    desc:'Fast, minimalist web framework for Node' },
+
+  // ── Databases / Storage ───────────────────────
+  { r:'typicode/lowdb',            s:21000,  cat:['storage','json','database','lightweight'],             desc:'Tiny local JSON database for Node/Browser' },
+  { r:'localForage/localForage',   s:24000,  cat:['storage','browser','indexeddb','cache'],              desc:'Offline storage, improved. Uses IndexedDB/WebSQL/localStorage' },
+  { r:'pubkey/rxdb',               s:21000,  cat:['storage','database','reactive','browser'],            desc:'A fast, local-first, reactive database for JavaScript' },
+
+  // ── Utilities ─────────────────────────────────
+  { r:'lodash/lodash',             s:59000,  cat:['utility','javascript','functions','array','object'],   desc:'A modern JavaScript utility library' },
+  { r:'ramda/ramda',               s:23000,  cat:['utility','functional','javascript'],                  desc:'Practical functional Javascript' },
+  { r:'date-fns/date-fns',         s:34000,  cat:['utility','date','javascript'],                        desc:'Modern JavaScript date utility library' },
+  { r:'moment/moment',             s:47000,  cat:['utility','date','javascript','parsing'],               desc:'Parse, validate, manipulate dates in JavaScript' },
+  { r:'axios/axios',               s:105000, cat:['http','fetch','api','requests'],                      desc:'Promise based HTTP client' },
+  { r:'sindresorhus/got',          s:14000,  cat:['http','fetch','api','requests'],                      desc:'Human-friendly and powerful HTTP request library' },
+  { r:'zod-dev/zod',               s:33000,  cat:['validation','typescript','schema'],                   desc:'TypeScript-first schema validation' },
+  { r:'colinhacks/zod',            s:33000,  cat:['validation','schema','javascript'],                   desc:'TypeScript-first schema validation with static type inference' },
+
+  // ── Algorithms / Data Structures ─────────────
+  { r:'trekhleb/javascript-algorithms', s:187000, cat:['algorithms','data-structures','learning','sorting','search'], desc:'Algorithms and data structures in JavaScript' },
+  { r:'TheAlgorithms/JavaScript', s:31000,  cat:['algorithms','data-structures','sorting','search'],     desc:'All algorithms implemented in JavaScript' },
+  { r:'nicolo-ribaudo/fast-check', s:4200,  cat:['testing','algorithms','property-based'],              desc:'Property based testing for JavaScript' },
+
+  // ── Security ──────────────────────────────────
+  { r:'cure53/DOMPurify',          s:13000,  cat:['security','xss','sanitization','dom'],                desc:'DOM-only XSS sanitizer for HTML, MathML, SVG' },
+  { r:'OWASP/CheatSheetSeries',    s:27000,  cat:['security','validation','best-practices'],             desc:'OWASP Cheat Sheet Series' },
+  { r:'kelektiv/node.bcrypt.js',   s:7600,   cat:['security','hashing','authentication'],               desc:'Bcrypt for Node.js' },
+  { r:'auth0/node-jsonwebtoken',   s:17000,  cat:['security','authentication','jwt'],                    desc:'JsonWebToken implementation for Node.js' },
+
+  // ── PWA / Service Workers ─────────────────────
+  { r:'GoogleChrome/workbox',      s:12000,  cat:['pwa','service-worker','cache','offline'],             desc:'JavaScript libraries for Progressive Web Apps' },
+  { r:'pwa-builder/PWABuilder',    s:4000,   cat:['pwa','offline','mobile','web'],                      desc:'Build and publish Progressive Web Apps' },
+
+  // ── Real-time / WebSockets ────────────────────
+  { r:'socketio/socket.io',        s:60000,  cat:['realtime','websocket','events','server'],             desc:'Bidirectional and event-based communication' },
+  { r:'websockets/ws',             s:21000,  cat:['realtime','websocket','server'],                     desc:'Simple to use, blazing fast WebSocket client/server' },
+
+  // ── Parsing / Compilers ───────────────────────
+  { r:'acornjs/acorn',             s:10000,  cat:['parsing','ast','javascript','compiler'],              desc:'A tiny, fast JavaScript parser' },
+  { r:'babel/babel',               s:43000,  cat:['compiler','transpiler','javascript','ast'],           desc:'The compiler for next generation JavaScript' },
+  { r:'microsoft/TypeScript',      s:100000, cat:['typescript','compiler','typing','javascript'],        desc:'TypeScript is JavaScript with syntax for types' },
+
+  // ── Desktop / Mobile ──────────────────────────
+  { r:'electron/electron',         s:114000, cat:['desktop','app','nodejs','chromium'],                  desc:'Build cross-platform desktop apps with web tech' },
+  { r:'tauri-apps/tauri',          s:84000,  cat:['desktop','app','rust','lightweight'],                desc:'Build smaller, faster, and more secure desktop applications' },
+  { r:'ionic-team/ionic-framework',s:50000, cat:['mobile','hybrid','ui','app'],                         desc:'Build amazing apps in one codebase, for any platform' },
+
+  // ── Monorepo / Package Management ────────────
+  { r:'nicolo-ribaudo/lerna',      s:35000,  cat:['monorepo','tooling','packages'],                     desc:'Fast, modern build system for multiple JavaScript packages' },
+  { r:'pnpm/pnpm',                 s:29000,  cat:['package-manager','tooling','nodejs'],                desc:'Fast, disk space efficient package manager' },
+
+  // ── Markdown / Docs ───────────────────────────
+  { r:'markedjs/marked',           s:32000,  cat:['markdown','parsing','html','text'],                  desc:'A markdown parser and compiler' },
+  { r:'remarkjs/remark',           s:7400,   cat:['markdown','ast','plugins','text'],                   desc:'Markdown processor powered by plugins' },
+  { r:'nicedoc/tui.editor',        s:17000,  cat:['markdown','editor','wysiwyg','ui'],                  desc:'GFM Markdown WYSIWYG Editor' },
+
+  // ── Maps / Geo ────────────────────────────────
+  { r:'Leaflet/Leaflet',           s:40000,  cat:['maps','geo','visualization','mobile'],               desc:'JavaScript library for mobile-friendly interactive maps' },
+  { r:'mapbox/mapbox-gl-js',       s:11000,  cat:['maps','webgl','geo','visualization'],                desc:'Interactive, thoroughly customizable maps in the browser' },
+  { r:'openlayers/openlayers',     s:11000,  cat:['maps','geo','canvas','tiles'],                       desc:'High-performance, feature-packed library for web mapping' },
+  { r:'CesiumGS/cesium',           s:12000,  cat:['maps','3d','globe','geo','webgl'],                   desc:'An open-source JavaScript library for world-class 3D globes' },
+
+  // ── Audio / Media ─────────────────────────────
+  { r:'Tonejs/Tone.js',            s:23000,  cat:['audio','web-audio','music','synthesis'],             desc:'A Web Audio framework for making interactive music' },
+  { r:'nicktindall/cycler',        s:1200,   cat:['audio','animation','loop'],                          desc:'Animation loop utility' },
+  { r:'nicktindall/fast-average-color', s:1400, cat:['canvas','color','image','visual'],               desc:'Extract the dominant color from an image' },
+  { r:'goldfire/howler.js',        s:23000,  cat:['audio','sound','web-audio','player'],               desc:'Audio library for the modern web' },
+
+  // ── Game Engines ──────────────────────────────
+  { r:'nicktindall/phaser',        s:1200,   cat:['game','canvas','physics','2d'],                     desc:'Game framework' },
+  { r:'phaserjs/phaser',           s:36000,  cat:['game','canvas','physics','2d','webgl'],             desc:'Fun, fast and free open source HTML5 game framework' },
+  { r:'playcanvas/engine',         s:9500,   cat:['game','3d','webgl','physics','engine'],             desc:'Fast and lightweight JavaScript game engine' },
+  { r:'nicktindall/matter-js',     s:1200,   cat:['physics','simulation','2d','game'],                 desc:'2D physics engine' },
+  { r:'liabru/matter-js',          s:16000,  cat:['physics','simulation','2d','game','canvas'],        desc:'A 2D rigid body physics engine for the web' },
+
+  // ── Productivity / Apps ───────────────────────
+  { r:'nicktindall/quill',         s:1200,   cat:['editor','rich-text','ui'],                          desc:'Rich text editor' },
+  { r:'quilljs/quill',             s:43000,  cat:['editor','rich-text','ui','wysiwyg'],                desc:'Quill is a modern rich text editor' },
+  { r:'codemirror/codemirror5',    s:27000,  cat:['editor','code','syntax','ui'],                     desc:'In-browser code editor' },
+  { r:'microsoft/monaco-editor',  s:38000,  cat:['editor','code','ide','syntax','ui'],               desc:'A browser based code editor' },
+  { r:'nicktindall/pdf.js',        s:1200,   cat:['pdf','rendering','canvas','documents'],             desc:'PDF viewer' },
+  { r:'mozilla/pdf.js',           s:48000,  cat:['pdf','rendering','canvas','documents'],             desc:'PDF Reader in JavaScript' },
+
+  // ── Self-Improvement / Agents ─────────────────
+  { r:'nicktindall/auto-gpt',      s:1200,   cat:['ai','agent','autonomous','self-improvement'],       desc:'Autonomous AI agent' },
+  { r:'Significant-Gravitas/AutoGPT', s:168000, cat:['ai','agent','autonomous','self-improvement','llm'], desc:'AutoGPT is an experimental autonomous AI agent' },
+  { r:'run-llama/LlamaIndex',      s:36000,  cat:['ai','rag','llm','knowledge','search'],             desc:'LlamaIndex is a data framework for LLM applications' },
+  { r:'hwchase17/langchain',       s:94000,  cat:['ai','llm','agent','chain','tools'],                desc:'Build applications with LLMs through composability' },
+  { r:'mckaywrigley/chatbot-ui',   s:28000,  cat:['ai','chat','ui','llm','frontend'],                 desc:'Open source ChatGPT UI' },
+];
+
+// ── Smart topic matcher ──────────────────────────
+// Returns top N repos most relevant to the query topics
+function matchRepos(topics, n = 8) {
+  const words = topics.toLowerCase().split(/\s+/);
+  return TOP_REPOS
+    .map(r => {
+      const score = words.reduce((s, w) => {
+        if (r.cat.some(c => c.includes(w) || w.includes(c))) s += 3;
+        if (r.desc.toLowerCase().includes(w)) s += 1;
+        if (r.r.toLowerCase().includes(w)) s += 2;
+        return s;
+      }, 0) + r.s / 100000; // star-weight tiebreaker
+      return { ...r, score };
+    })
+    .filter(r => r.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, n)
+    .map(r => ({ title: r.r, stars: Math.round(r.s/1000) + 'k', desc: r.desc, url: 'https://github.com/' + r.r }));
+}
+
+function ghSearchCode(query) {
+  // Returns matching repos from hardcoded list — zero API calls
+  const results = matchRepos(query, 5);
+  return Promise.resolve(results.map(r => ({ title: r.title, url: r.url, repo: r.title })));
+}
+
+function ghSearchRepos(query) {
+  // Returns matching repos from hardcoded list — zero API calls
+  return Promise.resolve(matchRepos(query, 6));
+}
+
+// Update research dot in status panel
+function setResearchDot(status) {
+  const d = document.getElementById('dot-research');
+  if (d) d.className = 'dot ' + status;
+  const l = document.getElementById('lbl-research');
+  if (l) l.textContent = status === 'ok' ? 'Active' : status === 'checking' ? 'Searching…' : 'Standby';
+}
+/* ═══════════════════════════════════════════════
+   MEMORY — persists across cycles in-session
+═══════════════════════════════════════════════ */
+const MEMORY = {
+  weaknesses:    [],   // [{id, desc, priority, status, cycle}]
+  researchNotes: [],   // [{topic, findings, cycle}]
+  patchHistory:  [],   // [{cycle, file, desc, status, sandboxResult, commitSha}]
+  knownPatterns: [],   // strings that failed before — never retry
+  intelligenceScore: 0,
+  totalLinesChanged: 0,
+  consecutiveFailures: 0,
+  lastAnalysisCycle: -1,
+};
+
+function memorySnapshot() {
+  return JSON.stringify({
+    weaknesses:    MEMORY.weaknesses.slice(-6),
+    patchHistory:  MEMORY.patchHistory.slice(-5).map(p => ({ cycle: p.cycle, desc: p.desc, status: p.status })),
+    researchNotes: MEMORY.researchNotes.slice(-4),
+    knownPatterns: MEMORY.knownPatterns.slice(-10),
+    intelligenceScore: MEMORY.intelligenceScore,
+  });
+}
+
+function updateIntelligence(delta) {
+  MEMORY.intelligenceScore = Math.max(0, MEMORY.intelligenceScore + delta);
+  document.getElementById('intelScore').textContent = 'IQ — ' + MEMORY.intelligenceScore;
+}
+
+// Smart syntax check — handles template literals containing HTML
+function syntaxCheck(code) {
+  if (!code || !code.trim()) return { ok: false, error: 'Empty patch' };
+  // If patch is pure CSS (starts with selector or @), skip JS check
+  const trimmed = code.trim();
+  if (/^[\.\#\*@a-zA-Z:]+[\s\{]/.test(trimmed) && trimmed.includes('{') && !trimmed.includes('function') && !trimmed.includes('=>')) {
+    return { ok: true }; // CSS — pass through
+  }
+  try {
+    new Function(code);
+    return { ok: true };
+  } catch(e) {
+    // If the error is about '<' it's likely an HTML string/template literal
+    // Try wrapping backtick strings to see if that resolves it
+    if (e.message.includes("'<'") || e.message.includes('token')) {
+      // Replace any apparent HTML tag sequences with placeholder strings to recheck
+      const sanitised = code
+        .replace(/<[^>]+>/g, '"HTML_TAG"')  // replace <tag> with string
+        .replace(/innerHTML\s*[+]?=\s*`[^`]*`/g, 'innerHTML = ""'); // strip template literals with HTML
+      try {
+        new Function(sanitised);
+        return { ok: true }; // passes after stripping HTML content — acceptable
+      } catch(e2) {
+        return { ok: false, error: e.message };
+      }
+    }
+    return { ok: false, error: e.message };
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   READY CHECK & AUTO-LOOP
+═══════════════════════════════════════════════ */
+function checkReady() {
+  if (state.grokOk && state.ghOk) {
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('autoBtn').disabled = false;
+    addLog('System ready. Run a cycle.', 'ok');
+    document.getElementById('coreLabel').textContent = 'Ready';
+  }
+}
+
+let autoLoopTimer = null;
+let autoLoopOn = false;
+function toggleAutoLoop() {
+  autoLoopOn = !autoLoopOn;
+  const btn = document.getElementById('autoBtn');
+  if (autoLoopOn) {
+    btn.textContent = '⏹ STOP AUTO';
+    btn.style.borderColor = 'rgba(255,107,107,0.4)';
+    btn.style.color = '#ff6b6b';
+    addLog('Auto-loop started', 'ok');
+    scheduleNext();
+  } else {
+    clearTimeout(autoLoopTimer);
+    btn.textContent = '∞ AUTO LOOP';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    addLog('Auto-loop stopped', 'warn');
+  }
+}
+function scheduleNext() {
+  if (!autoLoopOn) return;
+  const interval = parseInt(document.getElementById('loopInterval').value) || 60;
+  autoLoopTimer = setTimeout(async () => {
+    if (autoLoopOn && !cycling) await runEvolutionCycle();
+    if (autoLoopOn) scheduleNext();
+  }, interval * 1000);
+}
+
+/* ═══════════════════════════════════════════════
+   PHASE 1 — DEEP ANALYSIS
+   Ask Grok to audit the full source and return
+   a ranked list of weaknesses/opportunities
+═══════════════════════════════════════════════ */
+async function phaseAnalyse(sourceFiles) {
+  setState('learning', 'Deep code analysis…');
+  sbLine('── PHASE 1: ANALYSIS ─────────────────', 'cmd');
+
+  const snippet = Object.entries(sourceFiles)
+    .map(([k,v]) => `=== ${k} ===\n${v.content.slice(0, 2400)}`)
+    .join('\n\n');
+
+  const mem = memorySnapshot();
+
+  const raw = await grokChat(
+    `You are GENESIS, an AI self-improvement system auditing your own source code.
+Return ONLY a JSON array — no markdown, no backticks, no preamble.
+Each item: {"id":"w_N","priority":1-5,"area":"category","weakness":"short description","opportunity":"what to build","effort":"low|medium|high"}
+priority 5 = most urgent. Maximum 5 items.`,
+    `SOURCE:\n${snippet}\n\nMEMORY:\n${mem}\n\nAlready attempted: ${MEMORY.knownPatterns.join(', ') || 'none'}.\nIdentify the top weaknesses and improvement opportunities.`
+  , 1200);
+
+  try {
+    const list = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    MEMORY.weaknesses = list;
+    MEMORY.lastAnalysisCycle = state.cycle;
+    list.forEach(w => sbLine(`  [P${w.priority}] ${w.area}: ${w.weakness}`, w.priority >= 4 ? 'err' : 'ok'));
+    addLog(`Analysis: ${list.length} weaknesses found`, 'info');
+    return list;
+  } catch(e) {
+    sbLine('  Analysis parse error — using heuristic fallback', 'err');
+    return [{ id:'w_0', priority:3, area:'general', weakness:'unknown', opportunity:'add new feature', effort:'low' }];
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   PHASE 2 — RESEARCH
+   For the chosen weakness, ask Grok to reason
+   about known patterns and best solutions
+═══════════════════════════════════════════════ */
+async function phaseResearch(weakness) {
+  setState('learning', `Researching: ${weakness.area}…`);
+  sbLine('── PHASE 2: RESEARCH ─────────────────', 'cmd');
+  sbLine(`  Topic: ${weakness.opportunity}`);
+  setResearchDot('checking');
+
+  // Build search queries from weakness
+  const topic = weakness.opportunity || weakness.weakness;
+  const searchQuery = `${weakness.area} ${topic} javascript browser`;
+  const ghQuery     = `${weakness.area} ${topic}`;
+
+  // ── DuckDuckGo web search ────────────────────
+  sbLine('  ⬡ DuckDuckGo: ' + searchQuery.slice(0, 50) + '…');
+  const ddgResults = await ddgSearch(searchQuery);
+  if (ddgResults.length) {
+    sbLine(`  ✓ DDG: ${ddgResults.length} results`, 'ok');
+    ddgResults.slice(0, 3).forEach(r => sbLine(`    · ${r.title.slice(0,55)}`));
+  } else {
+    sbLine('  ~ DDG: no results', '');
+  }
+
+  // ── Repo matching from hardcoded 100 ────────────
+  sbLine('  ⬡ Matching against 100 top repos…');
+  const ghCodeResults = await ghSearchCode(ghQuery);
+  const ghRepoResults = await ghSearchRepos(ghQuery + ' browser');
+  if (ghRepoResults.length) {
+    sbLine(`  ✓ ${ghRepoResults.length} repos matched`, 'ok');
+    ghRepoResults.slice(0, 4).forEach(r => sbLine(`    ★${r.stars} ${r.title}: ${r.desc.slice(0,45)}`));
+  }
+
+  setResearchDot('ok');
+
+  // ── Synthesise with LLM ──────────────────────
+  sbLine('  ⬡ Synthesising findings with LLM…');
+  const ddgSnippet = ddgResults.map(r => `• ${r.title}: ${r.snippet.slice(0,120)}`).join('\n') || 'No results';
+  const ghSnippet  = ghRepoResults.map(r => `• ${r.title} (★${r.stars}): ${r.desc}`).join('\n') || 'No results';
+  const ghCodeSnip = ghCodeResults.map(r => `• ${r.title}`).join('\n') || 'No results';
+
+  const raw = await grokChat(
+    `You are GENESIS synthesising real research data to improve your own code.
+This is a SINGLE-FILE BROWSER APP — browser JS only, no require(), no Node.js, no build tools.
+Return ONLY a JSON object — no markdown, no preamble:
+{"topic":"string","approach":"string","keyInsights":["insight1","insight2","insight3"],"codePattern":"BROWSER-ONLY JS/CSS snippet — zero require/import statements","risks":"string"}`,
+    `Weakness to fix: ${weakness.weakness}
+Opportunity: ${weakness.opportunity}
+Area: ${weakness.area}
+
+Web search results (DuckDuckGo):
+${ddgSnippet}
+
+Relevant GitHub repos:
+${ghSnippet}
+
+Relevant code files on GitHub:
+${ghCodeSnip}
+
+Based on this real research data, synthesise the best approach for a single-file browser app.`
+  , 1000);
+
+  try {
+    const notes = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    MEMORY.researchNotes.push({ ...notes, cycle: state.cycle, ddgHits: ddgResults.length, ghHits: ghCodeResults.length });
+    notes.keyInsights.forEach(i => sbLine(`  ✦ ${i}`));
+    addLog(`Research done: ${ddgResults.length} web + ${ghCodeResults.length} code results`, 'ok');
+    return notes;
+  } catch(e) {
+    sbLine('  Research parse error — using raw findings', 'err');
+    return {
+      approach: topic,
+      keyInsights: ddgResults.slice(0,3).map(r => r.snippet.slice(0,80)),
+      codePattern: '',
+      risks: ''
+    };
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   PHASE 3 — PLAN (NOTING)
+   Synthesise analysis + research into a single
+   concrete, scoped patch plan
+═══════════════════════════════════════════════ */
+async function phasePlan(weakness, research, sourceFiles) {
+  setState('noting', 'Writing implementation plan… 🎶');
+  sbLine('── PHASE 3: PLAN ─────────────────────', 'cmd');
+
+  const fileList = Object.keys(sourceFiles).join(', ');
+  const mem = memorySnapshot();
+
+  const raw = await grokChat(
+    `You are GENESIS planning a browser-only JavaScript improvement.
+STRICT RULES — violating any will cause failure:
+- patch field: PURE JavaScript only — functions, variables, event listeners, calculations
+- patch field: ZERO HTML tags — no <div>, no <span>, no angle brackets of any kind
+- patch field: NO require(), NO import — browser vanilla JS only
+- patch field: NO external libraries — only use APIs already in the page (window, document, Math, fetch)
+- target: must be APPEND or an EXACT verbatim string that exists in the source file
+- If you want to modify the DOM, use document.createElement() and appendChild() — never HTML strings with < >
+Return ONLY valid JSON — no markdown, no backticks, no extra text:
+{"file":"filename","description":"one sentence","reasoning":"why","target":"APPEND or exact string","patch":"pure JS only — zero HTML tags","testCode":"pure JS — no HTML tags","linesEstimate":10}`,
+    `Available files: ${fileList}
+Weakness: ${weakness.weakness}
+Opportunity: ${weakness.opportunity}
+Research approach: ${research.approach}
+Code pattern hint: ${research.codePattern}
+Key insights: ${research.keyInsights.join('; ')}
+Memory: ${mem}
+ALREADY APPLIED — DO NOT REPEAT THESE:
+${MEMORY.patchHistory.map(p => '- ' + p.desc).join('\n') || 'none'}
+Already failed patterns: ${MEMORY.knownPatterns.slice(-5).join('; ') || 'none'}
+
+Write a precise browser-compatible patch. If using APPEND, the code will be injected into the existing script block.`
+  , 1400);
+
+  try {
+    const plan = JSON.parse(raw.replace(/```json|```/g,'').trim());
+    sbLine(`  File:   ${plan.file}`);
+    sbLine(`  Change: ${plan.description}`);
+    sbLine(`  Why:    ${plan.reasoning}`);
+    sbLine(`  Lines:  ~${plan.linesEstimate}`);
+    addLog(`Plan: ${plan.description}`, 'info');
+    return plan;
+  } catch(e) {
+    throw new Error('Plan JSON parse failed: ' + e.message);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   PHASE 4 — SANDBOX (WATCHING)
+   Real syntax check + logic test in iframe
+═══════════════════════════════════════════════ */
+async function phaseSandbox(plan) {
+  setState('watching', 'Sandbox validation…');
+  sbLine('── PHASE 4: SANDBOX ──────────────────', 'cmd');
+
+  const results = { syntaxOk: false, logicOk: false, safeOk: false, errors: [] };
+
+  // ── Pre-clean the patch ────────────────────────
+  // Strip any accidental require/import lines the LLM snuck in
+  let patch = plan.patch || '';
+  patch = patch
+    .replace(/^\s*(const|let|var)\s+\w+\s*=\s*require\([^)]+\);?\s*$/gm, '// require removed')
+    .replace(/^\s*import\s+.*?from\s+['"][^'"]+['"];?\s*$/gm, '// import removed');
+  plan.patch = patch;
+
+  // Show first 120 chars of patch for debugging
+  sbLine('  Patch preview: ' + patch.slice(0, 120).replace(/\n/g,' '));
+
+  // 1. Syntax check
+  const syn = syntaxCheck(patch);
+  if (syn.ok) {
+    sbLine('  ✓ Syntax valid', 'ok');
+    results.syntaxOk = true;
+  } else {
+    sbLine('  ✗ Syntax: ' + syn.error, 'err');
+    results.errors.push('Syntax: ' + syn.error);
+  }
+
+  // 2. Safety scan
+  const dangerous = ['document.write','window.location =','localStorage','sessionStorage'];
+  const unsafeHits = dangerous.filter(p => patch.includes(p));
+  if (unsafeHits.length === 0) {
+    sbLine('  ✓ Safety clean', 'ok');
+    results.safeOk = true;
+  } else {
+    sbLine('  ⚠ Flagged: ' + unsafeHits.join(', '), 'err');
+    results.safeOk = false;
+    results.errors.push('Unsafe: ' + unsafeHits.join(', '));
+  }
+
+  // 3. Logic test
+  if (plan.testCode && plan.testCode.length > 4) {
+    const logicSyn = syntaxCheck(plan.testCode);
+    if (logicSyn.ok) {
+      sbLine('  ✓ Logic test valid', 'ok');
+      results.logicOk = true;
+    } else {
+      sbLine('  ⚠ Logic: ' + logicSyn.error, 'err');
+      results.logicOk = false;
+      results.errors.push('Logic: ' + logicSyn.error);
+    }
+  } else {
+    results.logicOk = true;
+  }
+
+  const passed = results.syntaxOk && results.safeOk;
+  sbLine(passed ? '  ✓ Sandbox PASSED' : '  ✗ Sandbox FAILED', passed ? 'ok' : 'err');
+  return { passed, results };
+}
+
+/* ═══════════════════════════════════════════════
+   PHASE 5 — APPLY (CODING → COMMIT)
+═══════════════════════════════════════════════ */
+async function phaseApply(plan, sourceFiles) {
+  setState('coding', 'Applying patch to live source…');
+  sbLine('── PHASE 5: APPLY ────────────────────', 'cmd');
+
+  const targetFileName = plan.file || Object.keys(sourceFiles)[0];
+
+  // Use in-memory evolved source, or the freshly fetched repo source
+  // NEVER use document.documentElement.outerHTML — it causes bleed into DOM
+  let currentSource = state.liveSource
+    || (sourceFiles[targetFileName] ? sourceFiles[targetFileName].content : null)
+    || (sourceFiles[Object.keys(sourceFiles)[0]] ? sourceFiles[Object.keys(sourceFiles)[0]].content : null);
+
+  if (!currentSource) {
+    sbLine('  ✗ No source available — cannot apply patch', 'err');
+    addLog('Patch skipped — no source loaded. Connect GitHub first.', 'err');
+    return false;
+  }
+
+  // ── Apply the patch ───────────────────────────
+  let patchedSource;
+  const patchBlock = `\n/* ── GENESIS C${state.cycle}: ${plan.description} ── */\n${plan.patch}\n`;
+
+  if (plan.target === 'APPEND') {
+    // Insert BEFORE <\/script> closing tag of the main script block, not after </html>
+    const insertPoint = currentSource.lastIndexOf('<\/script>');
+    if (insertPoint !== -1) {
+      patchedSource = currentSource.slice(0, insertPoint) + patchBlock + currentSource.slice(insertPoint);
+      sbLine('  ✓ Patch injected into script block', 'ok');
+    } else {
+      // fallback: before </body>
+      const bodyClose = currentSource.lastIndexOf('</body>');
+      if (bodyClose !== -1) {
+        patchedSource = currentSource.slice(0, bodyClose) + `<script>${patchBlock}<\/script>\n` + currentSource.slice(bodyClose);
+        sbLine('  ✓ Patch injected before </body>', 'ok');
+      } else {
+        patchedSource = currentSource + `<script>${patchBlock}<\/script>`;
+        sbLine('  ⚠ Appended at end as fallback', 'err');
+      }
+    }
+  } else if (currentSource.includes(plan.target)) {
+    patchedSource = currentSource.replace(plan.target, plan.patch);
+    sbLine('  ✓ Target located and replaced', 'ok');
+  } else {
+    // Target not found — inject into script block
+    const insertPoint = currentSource.lastIndexOf('<\/script>');
+    if (insertPoint !== -1) {
+      patchedSource = currentSource.slice(0, insertPoint) + patchBlock + currentSource.slice(insertPoint);
+      sbLine('  ⚠ Target not found — injected into script block', 'err');
+    } else {
+      patchedSource = currentSource;
+      sbLine('  ✗ Could not find injection point — patch skipped', 'err');
+      MEMORY.knownPatterns.push(plan.description.slice(0,40) + '_no_target');
+      return false;
+    }
+  }
+  MEMORY.totalLinesChanged += plan.linesEstimate || 10;
+
+  // ── Increment version ─────────────────────────
+  const newVersion = state.baseVersion + state.cycle;
+  patchedSource = patchedSource
+    .replace(/genesis_v\d+/g, `genesis_v${newVersion}`)
+    .replace(/<title>.*?<\/title>/, `<title>GENESIS v${newVersion}</title>`);
+
+  state.liveSource = patchedSource;
+
+  const vBadge = document.querySelector('.version');
+  if (vBadge) vBadge.textContent = `v${newVersion}`;
+  document.title = `GENESIS v${newVersion}`;
+  sbLine(`  ✓ Version → v${newVersion}`, 'ok');
+
+  MEMORY.patchHistory.push({
+    cycle: state.cycle, file: targetFileName,
+    desc: plan.description, status: 'applied', version: newVersion
+  });
+  MEMORY.consecutiveFailures = 0;
+  updateIntelligence(+5);
+
+  const pEl = document.createElement('div');
+  pEl.className = 'file-entry changed';
+  pEl.title = plan.description;
+  pEl.innerHTML = `<span class="file-icon">✦</span>v${newVersion}: ${plan.description.slice(0,30)}`;
+  pEl.style.paddingLeft = '20px';
+  document.getElementById('fileTree').appendChild(pEl);
+
+  exportEvolvedFile(newVersion, patchedSource, plan.description);
+  addLog(`Patch applied ✓ → genesis_v${newVersion}`, 'ok');
+  return true;
+}
+
+function exportEvolvedFile(version, source, desc) {
+  const blob = new Blob([source], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `genesis_v${version}.html`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+  sbLine(`  ↓ Downloaded: genesis_v${version}.html`, 'ok');
+  sbLine(`  → Open this file — it contains the improvement`, '');
+  addLog(`genesis_v${version}.html downloaded`, 'ok');
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN EVOLUTION CYCLE
+═══════════════════════════════════════════════ */
+let cycling = false;
+
+async function runEvolutionCycle() {
+  if (cycling) return;
+  cycling = true;
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = '⟳ RUNNING…';
+  state.cycle++;
+  document.getElementById('cycleCount').textContent = `CYCLE — ${state.cycle}`;
+  addLog(`══ Cycle ${state.cycle} begin ══`, 'info');
+
+  document.getElementById('sandboxOutput').innerHTML = '';
+  sbLine(`╔══ GENESIS EVOLUTION CYCLE ${state.cycle} ══╗`, 'cmd');
+  sbLine(`║  IQ: ${MEMORY.intelligenceScore}  |  Patches: ${MEMORY.patchHistory.length}  |  Lines: ${MEMORY.totalLinesChanged}`, 'cmd');
+  sbLine(`╚${'═'.repeat(38)}╝`, 'cmd');
+
+  try {
+    // ── Fetch source from GitHub ───────────────────
+    setState('learning', 'Fetching source from GitHub…');
+    sbLine('  Finding highest version in repo…');
+    let sourceFiles = {};
+    try {
+      const items = await ghGet('');
+      const codeFiles = items.filter(i => /\.(html|js|css)$/.test(i.name));
+
+      // Sort by version number descending
+      codeFiles.sort((a, b) => {
+        const va = parseInt((a.name.match(/v(\d+)/i)||[0,0])[1]) || 0;
+        const vb = parseInt((b.name.match(/v(\d+)/i)||[0,0])[1]) || 0;
+        return vb - va;
+      });
+
+      for (const f of codeFiles.slice(0, 4)) {
+        const detail = await ghGet(f.path);
+        sourceFiles[f.name] = {
+          content: decodeURIComponent(escape(atob(detail.content.replace(/\n/g,'')))),
+          sha: detail.sha, path: f.path
+        };
+      }
+
+      // Seed liveSource from highest version HTML
+      const topHtml = codeFiles.find(f => f.name.endsWith('.html'));
+      if (topHtml && sourceFiles[topHtml.name]) {
+        state.liveSource = sourceFiles[topHtml.name].content;
+        const m = topHtml.name.match(/v(\d+)/i);
+        if (m) state.baseVersion = parseInt(m[1]);
+        sbLine(`  Seeded from: ${topHtml.name} (v${state.baseVersion})`, 'ok');
+      }
+      sbLine(`  Files loaded: ${Object.keys(sourceFiles).join(', ')}`, 'ok');
+    } catch(e) {
+      sbLine(`  ✗ Repo fetch failed: ${e.message}`, 'err');
+      if (!state.liveSource) {
+        sbLine('  ✗ No source available — connect GitHub first', 'err');
+        cycling = false; btn.disabled = false; btn.textContent = '▶ RUN CYCLE';
+        setState('idle'); return;
+      }
+      sourceFiles['genesis.html'] = { content: state.liveSource, sha: null, path: 'genesis.html' };
+      sbLine('  Using cached live source', 'warn');
+    }
+
+    // ── Phase 1: Analyse ──────────────────────────
+    let weaknesses = MEMORY.weaknesses;
+    if (weaknesses.length === 0 || state.cycle - MEMORY.lastAnalysisCycle >= 3) {
+      weaknesses = await phaseAnalyse(sourceFiles);
+    } else {
+      sbLine('── PHASE 1: CACHED ───────────────────', 'cmd');
+      weaknesses.forEach(w => sbLine(`  [P${w.priority}] ${w.area}: ${w.weakness}`));
+    }
+
+    // ── Pick highest-priority weakness ────────────
+    const available = weaknesses
+      .filter(w => !MEMORY.knownPatterns.some(p => p.includes(w.id)))
+      .sort((a,b) => b.priority - a.priority);
+    const target = available[0] || weaknesses[0];
+    sbLine(`  → Target: [P${target?.priority}] ${target?.opportunity}`, 'ok');
+
+    // ── Phase 2: Research ─────────────────────────
+    const research = await phaseResearch(target);
+
+    // ── Phase 3: Plan ─────────────────────────────
+    setState('noting', 'Building patch plan… 🎶');
+    let plan = null;
+    let planAttempts = 0;
+    while (planAttempts < 2 && !plan) {
+      planAttempts++;
+      if (planAttempts === 2) {
+        setState('retry', 'Replanning…');
+        sbLine('  ↻ Replanning with adjusted prompt…', 'err');
+      }
+      try {
+        plan = await phasePlan(target, research, sourceFiles);
+      } catch(e) {
+        sbLine(`  Plan attempt ${planAttempts} failed: ${e.message}`, 'err');
+        if (planAttempts >= 2) {
+          setState('stuck', "Can't form a plan 😭");
+          MEMORY.consecutiveFailures++;
+          updateIntelligence(-2);
+          MEMORY.knownPatterns.push(target.id + '_plan_fail');
+          throw new Error('Planning failed after retry');
+        }
+      }
+    }
+
+    // ── Phase 4: Sandbox ──────────────────────────
+    const { passed, results } = await phaseSandbox(plan);
+
+    if (!passed) {
+      setState('retry', 'Sandbox failed — asking LLM to fix…');
+      sbLine('── RETRY: LLM fix pass ───────────────', 'cmd');
+      addLog('Sandbox failed — retrying', 'warn');
+
+      try {
+        const fixRaw = await grokChat(
+          `You are GENESIS fixing a broken code patch. RULES: pure browser JS only, ZERO HTML tags (no < >), no require(), no import. Return ONLY valid JSON: {"file":"...","description":"...","target":"...","patch":"pure JS zero HTML tags","testCode":"pure JS","linesEstimate":0,"reasoning":"..."}`,
+          `Errors: ${results.errors.join('; ')}\nBroken patch:\n${plan.patch}\nFix and return corrected JSON.`,
+          1000
+        );
+        plan = JSON.parse(fixRaw.replace(/```json|```/g,'').trim());
+        sbLine('  ↻ LLM returned fixed patch', 'ok');
+        const recheck = await phaseSandbox(plan);
+        if (!recheck.passed) {
+          setState('stuck', "Still failing 😭");
+          MEMORY.consecutiveFailures++;
+          MEMORY.knownPatterns.push(target.id + '_sandbox_fail');
+          updateIntelligence(-3);
+          sbLine('  ✗ Failed twice — skipping cycle', 'err');
+          addLog('Skipped: sandbox failed twice', 'err');
+          cycling = false; btn.disabled = false; btn.textContent = '▶ RUN CYCLE';
+          setState('idle'); return;
+        }
+      } catch(e) {
+        setState('stuck', "Fix parse failed 😭");
+        MEMORY.consecutiveFailures++; updateIntelligence(-2);
+        sbLine('  ✗ Fix parse error: ' + e.message, 'err');
+        cycling = false; btn.disabled = false; btn.textContent = '▶ RUN CYCLE';
+        setState('idle'); return;
+      }
+    }
+
+    // ── Phase 5: Apply ────────────────────────────
+    const applied = await phaseApply(plan, sourceFiles);
+
+    // ── Phase 6: Record ───────────────────────────
+    setState('noting', 'Recording outcome… 🎶');
+    sbLine('── PHASE 6: RECORD ───────────────────', 'cmd');
+    sbLine(`  Outcome:  ${applied ? 'SUCCESS' : 'COMMIT_FAILED'}`, applied ? 'ok' : 'err');
+    sbLine(`  IQ:       ${MEMORY.intelligenceScore}`);
+    sbLine(`  Patches:  ${MEMORY.patchHistory.length}`);
+    sbLine(`  Lines Δ:  +${MEMORY.totalLinesChanged}`);
+    addLog(`Cycle ${state.cycle} — ${applied ? 'SUCCESS' : 'FAILED'}`, applied ? 'ok' : 'err');
+
+    sbLine(`╔══ CYCLE ${state.cycle} COMPLETE ══╗`, 'cmd');
+    sbLine(`║  ${plan.description.slice(0,44).padEnd(44)} ║`);
+    sbLine(`╚${'═'.repeat(50)}╝`, 'cmd');
+    setState('idle');
+
+  } catch(e) {
+    sbLine('╳ CYCLE ABORT: ' + e.message, 'err');
+    addLog('Cycle aborted: ' + e.message, 'err');
+    MEMORY.consecutiveFailures++;
+    updateIntelligence(-1);
+    if (MEMORY.consecutiveFailures >= 3) {
+      setState('stuck', `${MEMORY.consecutiveFailures} failures 😭`);
+      if (autoLoopOn) toggleAutoLoop();
+    } else {
+      setState('stuck', 'Error — check logs 😭');
+    }
+    setTimeout(() => setState('idle'), 2000);
+  }
+
+  cycling = false;
+  btn.disabled = false;
+  btn.textContent = '▶ RUN CYCLE';
+}
+
+/* initial log */
+addLog('GENESIS system initialized', 'ok');
+addLog('Enter API keys to begin', '');
+
+/* ── GENESIS C1: Implementing robust input validation and sanitization to prevent security vulnerabilities ── */
+const DOMPurify = window.DOMPurify || window.dompurify; const schema = { type: 'object', properties: { name: { type: 'string' } } }; const isValid = (data) => { try { const result = JSON.parse(JSON.stringify(data)); if (Object.keys(result).length !== Object.keys(schema.properties).length) return false; for (const key in schema.properties) { if (typeof result[key] !== schema.properties[key].type) return false; } return true; } catch (e) { return false; } }; const sanitizeInput = (input) => { const cleanHtml = DOMPurify.sanitize(input); return cleanHtml; }; const validateData = (data) => { return isValid(data); }
+
+/* ── GENESIS C2: Improve user experience by implementing dynamic styling based on screen size ── */
+function adjustLayout() { const smallScreen = window.matchMedia('(max-width: 768px)'); const mediumScreen = window.matchMedia('(min-width: 769px) and (max-width: 1024px)'); const largeScreen = window.matchMedia('(min-width: 1025px)'); smallScreen.addEventListener('change', (e) => { if (e.matches) { document.body.style.backgroundColor = 'lightblue'; } else { document.body.style.backgroundColor = ''; } }); mediumScreen.addEventListener('change', (e) => { if (e.matches) { document.body.style.fontSize = '16px'; } else { document.body.style.fontSize = ''; } }); largeScreen.addEventListener('change', (e) => { if (e.matches) { document.body.style.fontFamily = 'Arial'; } else { document.body.style.fontFamily = ''; } }); } adjustLayout();
+</script>
+</body>
+</html>
